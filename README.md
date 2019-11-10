@@ -65,3 +65,5 @@ AliDDNSNet 是基于 .NET Core 开发的动态 DNS 解析工具，借助于阿�
 如果你的设备支持 Docker 环境，建议通过 Docker 运行 .NET Core 2.1 环境来执行本程序。
 
 [下载地址在这儿](https://github.com/GameBelial/AliDDNSNet/releases)
+
+## 3、本人在原作者基础上添加了IPV6 的支持，但是本人是通过解析ipconfig的返回结果来拿到ipv6地址的。故仅支持Window系统（兼容性堪忧，若需要使用ipv6的动态解析，请检测后再使用）。

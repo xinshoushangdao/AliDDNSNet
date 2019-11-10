@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using AliDDNSNet.Request;
 using AliDDNSNet.Utility;
@@ -21,7 +22,7 @@ namespace AliDDNSNet
             app.OnExecute(async () =>
             {
                 #region > 配置初始化 <
-                
+
                 // 加载当前目录的配置文件
                 var filePath = attachments.HasValue()
                     ? attachments.Value()
@@ -34,16 +35,27 @@ namespace AliDDNSNet
                 }
 
                 Utils.Configuration = await Utils.ReadConfigFile(filePath);
-                
+
                 #endregion
 
                 #region > 校验 IP 是否需要进行更改 <
-                
-                // 获得当前机器的公网 IP 地址
-                var currentIpAddress = (await Utils.GetCurrentPublicIpAddress()).Replace("\n", "");
-                var subDomainsJObject = JObject.Parse(await Utils.SendGetRequest(new DescribeDomainRecordsRequest(Utils.Configuration.domain)));
 
-                if (subDomainsJObject.SelectToken($"$.DomainRecords.Record[?(@.RR == '{Utils.Configuration.sub_domain}')]") == null)
+                // 获得当前机器的公网 IP 地址
+                string currentIpAddress;
+                if (Utils.Configuration.type.Equals("AAAA"))
+                {
+                    currentIpAddress = await Utils.GetCurrentPublicIpv6();
+                }
+                else
+                {
+                    currentIpAddress = await Utils.GetCurrentPublicIpv4();
+                }
+                var subDomainsJObject =
+                    JObject.Parse(
+                        await Utils.SendGetRequest(new DescribeDomainRecordsRequest(Utils.Configuration.domain)));
+
+                if (subDomainsJObject.SelectToken(
+                        $"$.DomainRecords.Record[?(@.RR == '{Utils.Configuration.sub_domain}')]") == null)
                 {
                     Console.WriteLine("指定的子域名不存在，请新建一个子域名解析。");
                     return 0;
@@ -53,7 +65,9 @@ namespace AliDDNSNet
                 Console.WriteLine($"{'='.BuildLineCharacter(20)}");
                 Console.WriteLine($"子域名:{Utils.Configuration.sub_domain}{Utils.Configuration.domain}");
 
-                var dnsIp = subDomainsJObject.SelectToken($"$.DomainRecords.Record[?(@.RR == '{Utils.Configuration.sub_domain}')].Value").Value<string>();
+                var dnsIp = subDomainsJObject
+                    .SelectToken($"$.DomainRecords.Record[?(@.RR == '{Utils.Configuration.sub_domain}')].Value")
+                    .Value<string>();
 
                 Console.WriteLine($"目前的 A 记录解析 IP 地址: {dnsIp}");
                 if (currentIpAddress == dnsIp)
@@ -61,13 +75,17 @@ namespace AliDDNSNet
                     Console.WriteLine("解析地址与当前主机 IP 地址一致，无需更改。");
                     return 0;
                 }
-                
+
                 #endregion
 
                 Console.WriteLine("检测到 IP 地址不一致，正在更改中......");
-                var rrId = subDomainsJObject.SelectToken($"$.DomainRecords.Record[?(@.RR == '{Utils.Configuration.sub_domain}')].RecordId").Value<string>();
+                var rrId = subDomainsJObject
+                    .SelectToken($"$.DomainRecords.Record[?(@.RR == '{Utils.Configuration.sub_domain}')].RecordId")
+                    .Value<string>();
 
-                var response = await Utils.SendGetRequest(new UpdateDomainRecordRequest(rrId, Utils.Configuration.sub_domain, Utils.Configuration.type, currentIpAddress, Utils.Configuration.interval.ToString()));
+                var response = await Utils.SendGetRequest(new UpdateDomainRecordRequest(rrId,
+                    Utils.Configuration.sub_domain, Utils.Configuration.type, currentIpAddress,
+                    Utils.Configuration.interval.ToString()));
 
                 var resultRrId = JObject.Parse(response).SelectToken("$.RecordId").Value<string>();
                 if (resultRrId == null || resultRrId != rrId)

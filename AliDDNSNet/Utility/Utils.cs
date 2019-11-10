@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
@@ -78,7 +80,7 @@ namespace AliDDNSNet.Utility
         /// <summary>
         /// 获得当前机器的公网 IP
         /// </summary>
-        public static async Task<string> GetCurrentPublicIpAddress()
+        public static async Task<string> GetCurrentPublicIpv4()
         {
             using (var client = new HttpClient())
             {
@@ -90,6 +92,19 @@ namespace AliDDNSNet.Utility
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// 获得当前机器的公网 IP
+        /// </summary>
+        public static async Task<string> GetCurrentPublicIpv6()
+        {
+            return CmdHelper
+                                .ExcuteCmd("ipconfig -all")
+                                .Split("\n").ToList()
+                                .Where(m => m.Contains("IPv6")&&m.Contains("首选"))
+                                .Select(m => m.Substring(m.IndexOf(": ", StringComparison.Ordinal) + 1).Replace("(首选) \r", "").Trim())
+                                .FirstOrDefault(m => !m.StartsWith("fe80") && !m.StartsWith(":"));
         }
 
         /// <summary>
